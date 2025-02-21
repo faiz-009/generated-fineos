@@ -55,13 +55,13 @@ jobs:
     parameters:
       # Parameters allow customization of Docker build arguments, such as service name, maintainer, and repo name.
       service-name:
-        default: java-demo  # Replace with the name of your root directory
+        default: generated-fineos  # Replace with the name of your root directory
         type: string
       maintainer:
         default: faiz.qureshi@everestek.com  # Replace with the Docker file maintainer's email
         type: string
       micro-service-name:
-        default: sftp-connector  # Replace with your specific microservice name
+        default: animal-insurance  # Replace with your specific microservice name
         type: string
       docker-repo:
         default: faizqureshi/java-demo  # Replace with your docker host repository name
