@@ -60,11 +60,14 @@ jobs:
       maintainer:
         default: faiz.qureshi@everestek.com  # Replace with the Docker file maintainer's email
         type: string
-      micro-service-name:
-        default: animal-insurance  # Replace with your specific microservice name
+      jar-file-name:
+        default: animal-insurance.war  # Replace with the name of the generated jar file.
         type: string
-      docker-repo:
-        default: faizqureshi/java-demo  # Replace with your docker host repository name
+      jar-file-path:
+        default: build/libs/animal-insurance.war  # Replace with the path where the generated jar file is located.
+        type: string
+      docker-hub-repo:
+        default: faizqureshi/java-demo  # Replace with your docker hub host repository name
         type: string
 
     steps:
@@ -78,7 +81,7 @@ jobs:
           command: chmod +x ./gradlew
 
       - run:
-          name: Maven build
+          name: Gradle build
           command: ./gradlew clean build -x test
 
       # Log in to Docker Hub using credentials stored as environment variables.
@@ -95,10 +98,10 @@ jobs:
             docker build \
               --build-arg SERVICE_NAME=<<parameters.service-name>> \
               --build-arg MAINTAINER=<<parameters.maintainer>> \
-              --build-arg JAR_FILE_PATH=target/<<parameters.micro-service-name>>-1.0.war \
-              --build-arg JAR_FILE_NAME=<<parameters.micro-service-name>>-1.0.war \
-              -t <<parameters.docker-repo>>:1.0.0-${TIMESTAMP}_SNAPSHOT .
-            docker push <<parameters.docker-repo>>:1.0.0-${TIMESTAMP}_SNAPSHOT
+              --build-arg JAR_FILE_PATH=<<parameters.jar-file-path>> \
+              --build-arg JAR_FILE_NAME=<<parameters.jar-file-name>> \
+              -t <<parameters.docker-hub-repo>>:1.0.0-${TIMESTAMP}_SNAPSHOT .
+            docker push <<parameters.docker-hub-repo>>:1.0.0-${TIMESTAMP}_SNAPSHOT
 
 # Define the workflow
 workflows:
