@@ -1,0 +1,56 @@
+version: 2.1
+
+# Define the executors
+executors:
+  java-executor:
+    docker:
+      - image: cimg/openjdk:21.0.2  # OpenJDK 21 Docker image for Java-based builds
+
+# Define the jobs
+jobs:
+  build-and-install:
+    executor: java-executor
+    steps:
+      - checkout
+
+      # Set execute permission for Gradle Wrapper
+      - run:
+          name: Set Execute Permission for Gradle Wrapper
+          command: chmod +x ./gradlew
+
+      # Download and cache dependencies
+      - run:
+          name: Resolve dependencies
+          command: ./gradlew dependencies
+
+      # Build and run tests with coverage
+      - run:
+          name: Build and Test
+          command: ./gradlew clean build test jacocoTestReport
+
+      # Store Jacoco code coverage reports
+      - store_artifacts:
+          path: build/reports/jacoco/test/html
+          destination: jacoco-test-reports/
+
+      # Store Checkstyle report
+      - store_artifacts:
+          path: build/reports/checkstyle/
+          destination: jacoco-test-reports/quality-checks/checkstyle
+
+      # Store the PMD report (usually found in 'target/pmd.xml') as an artifact.
+      - store_artifacts:
+          path: build/reports/pmd/
+          destination: jacoco-test-reports/quality-checks/pmd
+
+      # Store the SpotBugs report (usually found in 'target/spotbugs.html') as an artifact.
+      - store_artifacts:
+          path: build/reports/spotbugs/
+          destination: jacoco-test-reports/quality-checks/spotbugs
+
+# Define the workflow
+workflows:
+  version: 2
+  build-test-workflow:
+    jobs:
+      - build-and-install
