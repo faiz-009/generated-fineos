@@ -51,7 +51,7 @@ jobs:
   # The 'package' job is responsible for building the Docker image for the application.
   package:
     executor: java-executor  # Using the same 'java-executor' as defined earlier
-
+    working_directory: ~/workspace
     parameters:
       # Parameters allow customization of Docker build arguments, such as service name, maintainer, and repo name.
       service-name:
