@@ -149,24 +149,11 @@ workflows:
     jobs:
       - build:
           name: build
-          filters:
-            branches:
-              only:
-                - main # Add your branch name
       - package:
           name: package
           requires:
             - build
-          filters:
-            branches:
-              only:
-                - main # Add your branch name
       - publish:
           name: publish
           requires:
             - package
-          filters:
-            branches:
-              only:
-                - main # Add your branch name
-      # Add your implementation for the deploy stage here.
