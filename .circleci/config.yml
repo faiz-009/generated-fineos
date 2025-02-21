@@ -102,7 +102,7 @@ jobs:
             docker save -o my-app.tar <<parameters.docker-hub-repo>>:${TAG}
             echo $TAG > tag.txt
       - persist_to_workspace:
-          root: ~/workspace
+          root: /home/circleci/workspace
           paths:
             - tag.txt
             - my-app.tar
@@ -115,13 +115,13 @@ jobs:
     steps:
       - checkout
       - attach_workspace:
-          at: ~/workspace
+          at: /home/circleci/workspace
       - setup_remote_docker
       # Load the previously built Docker image from the tar file.
       - run:
           name: Load Docker image from gzip
           command: |
-            docker load -i ~/workspace/my-app.tar
+            docker load -i /home/circleci/workspace/my-app.tar
             # Authenticate with Docker Hub.
       # Log in to Docker Hub using credentials stored as environment variables in circleCI.
       # It allows CircleCI to push images to the Docker registry.
