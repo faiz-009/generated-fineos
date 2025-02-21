@@ -99,7 +99,7 @@ jobs:
               --build-arg JAR_FILE_PATH=<<parameters.jar-file-path>> \
               --build-arg JAR_FILE_NAME=<<parameters.jar-file-name>> \
               -t <<parameters.docker-hub-repo>>:${TAG} .
-            docker save -o my-app.tar <<parameters.repo>>:${TAG}
+            docker save -o my-app.tar <<parameters.docker-hub-repo>>:${TAG}
             echo $TAG > tag.txt
             docker push <<parameters.docker-hub-repo>>:${TAG}
             # Save the generated tag and Docker image for later stages.
