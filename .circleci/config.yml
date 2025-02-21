@@ -85,14 +85,8 @@ jobs:
 
       - run:
           name: Gradle build
-          command: ./gradlew clean build \
-            -x test \
-            -x checkstyleMain \
-            -x checkstyleTest \
-            -x pmdMain \
-            -x pmdTest \
-            -x spotbugsMain \
-            -x spotbugsTest
+          command: |
+            ./gradlew clean build -x test -x checkstyleMain -x checkstyleTest -x pmdMain -x pmdTest -x spotbugsMain -x spotbugsTest
 
     # Build the Docker image using the parameters provided.
       - run:
