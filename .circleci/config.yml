@@ -4,56 +4,60 @@ version: 2.1
 executors:
   java-executor:
     docker:
-      - image: cimg/openjdk:21.0.2  # OpenJDK 21 Docker image for Java-based builds
+      - image: cimg/openjdk:21.0.2  # Use OpenJDK 21 Docker image for Java-based builds
 
+# Define pipeline parameters, change default values accordingly.
 parameters:
   service-name:
     default: generated-fineos
+    description: Name of the service or the root directory of the project.
     type: string
   maintainer:
     default: faiz.qureshi@everestek.com
+    description: Email of the maintainer of the docker file.
     type: string
   jar-file-name:
     default: animal-insurance.war
+    description: Name of the generated JAR file of the project.
     type: string
   jar-file-path:
     default: build/libs/animal-insurance.war
+    description: Path where the generated JAR file is located.
     type: string
   docker-hub-repo:
     default: faizqureshi/java-demo
+    description: Name of the Docker Hub repository where the image will be pushed once built successfully.
     type: string
   docker-image-version:
     default: 1.0.0
+    description: Latest version of the Docker image that will be used in the image tag.
     type: string
 
-# Define the jobs
+# Define jobs
 jobs:
   build:
     executor: java-executor
     steps:
-      - checkout
+      - checkout  # Checkout the source code from the repository
 
-      # Set execute permission for Gradle Wrapper
       - run:
           name: Set Execute Permission for Gradle Wrapper
-          command: chmod +x ./gradlew
+          command: chmod +x ./gradlew  # Ensure Gradle wrapper script is executable
 
-      # Download and cache dependencies
       - run:
           name: Resolve dependencies
-          command: ./gradlew dependencies
+          command: ./gradlew dependencies  # Download and cache project dependencies
 
-      # Build and run tests with coverage
       - run:
           name: Build and Test
-          command: ./gradlew clean build test jacocoTestReport
+          command: ./gradlew clean build test jacocoTestReport  # Build, run tests, and generate test coverage reports
 
-      # Store Jacoco code coverage reports
+      # Store test coverage reports
       - store_artifacts:
           path: build/reports/jacoco/test/html
           destination: jacoco-test-reports/
 
-      # Store quality check reports
+      # Store static analysis reports
       - store_artifacts:
           path: build/reports/checkstyle/
           destination: quality-checks/checkstyle
@@ -64,80 +68,77 @@ jobs:
           path: build/reports/spotbugs/
           destination: quality-checks/spotbugs
 
-      # Persist compiled JAR file and build outputs
       - persist_to_workspace:
           root: .
           paths:
-            - <<pipeline.parameters.jar-file-path>>
+            - <<pipeline.parameters.jar-file-path>>  # Save the built JAR file for later jobs
 
   package:
     executor: java-executor
-    working_directory: ~/workspace
+    working_directory: ~/workspace  # Define working directory for this job
 
     steps:
-      - checkout
+      - checkout  # Checkout the source code
 
-      # Attach workspace to use the built JAR file
       - attach_workspace:
-          at: .
+          at: .  # Attach the workspace from the build job
 
-      # Set up Docker
-      - setup_remote_docker
+      - setup_remote_docker  # Enable remote Docker support
 
-      # Build and save Docker image
       - run:
           name: Build and save Docker Image
           command: |
-            export TIMESTAMP=$(date +"%Y%m%d%H%M%S")
+            export TIMESTAMP=$(date +"%Y%m%d%H%M%S")  # Generate a timestamp for the Docker image tag
             export TAG=<<pipeline.parameters.docker-image-version>>-${TIMESTAMP}_SNAPSHOT
+            
+            # Build Docker image using parameters
             docker build \
               --build-arg SERVICE_NAME=<<pipeline.parameters.service-name>> \
               --build-arg MAINTAINER=<<pipeline.parameters.maintainer>> \
               --build-arg JAR_FILE_PATH=<<pipeline.parameters.jar-file-path>> \
               --build-arg JAR_FILE_NAME=<<pipeline.parameters.jar-file-name>> \
               -t <<pipeline.parameters.docker-hub-repo>>:${TAG} .
+            
+            # Save Docker image to a tar file
             docker save -o my-app.tar <<pipeline.parameters.docker-hub-repo>>:${TAG}
+            
+            # Save the tag information for the publish job
             echo $TAG > tag.txt
 
-      # Persist Docker image and tag for publish job
       - persist_to_workspace:
           root: /home/circleci/workspace
           paths:
-            - tag.txt
-            - my-app.tar
+            - tag.txt  # Save the image tag information for the next job
+            - my-app.tar  # Save the built Docker image
 
   publish:
     executor: java-executor
     steps:
-      - checkout
+      - checkout  # Checkout the source code
       - attach_workspace:
-          at: /home/circleci/workspace
-      - setup_remote_docker
+          at: /home/circleci/workspace  # Attach the workspace from the package job
+      - setup_remote_docker  # Enable remote Docker support
 
-      # Load tag name
       - run:
           name: Export Metadata
           command: |
-            export TAG="$(cat /home/circleci/workspace/tag.txt)"
+            export TAG="$(cat /home/circleci/workspace/tag.txt)"  # Read the image tag from the file
             echo "TAG='${TAG}'"
-            echo "export TAG='${TAG}'" >> $BASH_ENV
+            echo "export TAG='${TAG}'" >> $BASH_ENV  # Persist the tag as an environment variable
 
-      # Load Docker image from tar file
       - run:
           name: Load Docker image
-          command: docker load -i /home/circleci/workspace/my-app.tar
+          command: docker load -i /home/circleci/workspace/my-app.tar  # Load the saved Docker image
 
-      # Log in to Docker Hub
       - run:
           name: Log in to Docker Hub
-          command: echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_USERNAME --password-stdin
+          command: echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_USERNAME --password-stdin  # Authenticate to Docker Hub
 
-      # Push Docker image to Docker Hub
       - run:
           name: Push Docker Image to Docker Hub
           command: |
             echo "Pushing image: $TAG"
-            docker push <<pipeline.parameters.docker-hub-repo>>:$TAG
+            docker push <<pipeline.parameters.docker-hub-repo>>:$TAG  # Push the image to Docker Hub
 
 # Define the workflow
 workflows:
@@ -145,12 +146,15 @@ workflows:
   build:
     jobs:
       - build:
-          name: build
+          name: build  # Run the build job first
       - package:
           name: package
           requires:
-            - build  # Ensure package runs only after build is done
+            - build  # Ensure the package job runs only after build is complete
       - publish:
           name: publish
           requires:
-            - package
+            - package  # Ensure the publishing job runs only after package is complete
+#      - deploy:
+#          name : Deploy
+#          # Add your implementation for the deploy stage here.
