@@ -101,8 +101,6 @@ jobs:
               -t <<parameters.docker-hub-repo>>:${TAG} .
             docker save -o my-app.tar <<parameters.docker-hub-repo>>:${TAG}
             echo $TAG > tag.txt
-            docker push <<parameters.docker-hub-repo>>:${TAG}
-            # Save the generated tag and Docker image for later stages.
       - persist_to_workspace:
           root: ~/workspace
           paths:
@@ -151,8 +149,6 @@ workflows:
           name: build
       - package:
           name: package
-          requires:
-            - build
       - publish:
           name: publish
           requires:
