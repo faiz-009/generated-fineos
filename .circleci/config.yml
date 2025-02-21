@@ -6,14 +6,30 @@ executors:
     docker:
       - image: cimg/openjdk:21.0.2  # OpenJDK 21 Docker image for Java-based builds
 
+parameters:
+  service-name:
+    default: generated-fineos
+    type: string
+  maintainer:
+    default: faiz.qureshi@everestek.com
+    type: string
+  jar-file-name:
+    default: animal-insurance.war
+    type: string
+  jar-file-path:
+    default: build/libs/animal-insurance.war
+    type: string
+  docker-hub-repo:
+    default: faizqureshi/java-demo
+    type: string
+  docker-image-version:
+    default: 1.0.0
+    type: string
+
 # Define the jobs
 jobs:
   build:
     executor: java-executor
-    parameters:
-      jar-file-path:
-        default: build/libs/animal-insurance.war
-        type: string
     steps:
       - checkout
 
@@ -52,30 +68,11 @@ jobs:
       - persist_to_workspace:
           root: .
           paths:
-            - <<parameters.jar-file-path>>
+            - <<pipeline.parameters.jar-file-path>>
 
   package:
     executor: java-executor
     working_directory: ~/workspace
-    parameters:
-      service-name:
-        default: generated-fineos
-        type: string
-      maintainer:
-        default: faiz.qureshi@everestek.com
-        type: string
-      jar-file-name:
-        default: animal-insurance.war
-        type: string
-      jar-file-path:
-        default: build/libs/animal-insurance.war
-        type: string
-      docker-hub-repo:
-        default: faizqureshi/java-demo
-        type: string
-      docker-image-version:
-        default: 1.0.0
-        type: string
 
     steps:
       - checkout
@@ -92,14 +89,14 @@ jobs:
           name: Build and save Docker Image
           command: |
             export TIMESTAMP=$(date +"%Y%m%d%H%M%S")
-            export TAG=<<parameters.docker-image-version>>-${TIMESTAMP}_SNAPSHOT
+            export TAG=<<pipeline.parameters.docker-image-version>>-${TIMESTAMP}_SNAPSHOT
             docker build \
-              --build-arg SERVICE_NAME=<<parameters.service-name>> \
-              --build-arg MAINTAINER=<<parameters.maintainer>> \
-              --build-arg JAR_FILE_PATH=<<parameters.jar-file-path>> \
-              --build-arg JAR_FILE_NAME=<<parameters.jar-file-name>> \
-              -t <<parameters.docker-hub-repo>>:${TAG} .
-            docker save -o my-app.tar <<parameters.docker-hub-repo>>:${TAG}
+              --build-arg SERVICE_NAME=<<pipeline.parameters.service-name>> \
+              --build-arg MAINTAINER=<<pipeline.parameters.maintainer>> \
+              --build-arg JAR_FILE_PATH=<<pipeline.parameters.jar-file-path>> \
+              --build-arg JAR_FILE_NAME=<<pipeline.parameters.jar-file-name>> \
+              -t <<pipeline.parameters.docker-hub-repo>>:${TAG} .
+            docker save -o my-app.tar <<pipeline.parameters.docker-hub-repo>>:${TAG}
             echo $TAG > tag.txt
 
       # Persist Docker image and tag for publish job
@@ -111,10 +108,6 @@ jobs:
 
   publish:
     executor: java-executor
-    parameters:
-      docker-hub-repo:
-        default: faizqureshi/java-demo
-        type: string
     steps:
       - checkout
       - attach_workspace:
@@ -144,7 +137,7 @@ jobs:
           name: Push Docker Image to Docker Hub
           command: |
             echo "Pushing image: $TAG"
-            docker push <<parameters.docker-hub-repo>>:$TAG
+            docker push <<pipeline.parameters.docker-hub-repo>>:$TAG
 
 # Define the workflow
 workflows:
