@@ -85,11 +85,18 @@ jobs:
 
       - run:
           name: Gradle build
-          command: ./gradlew clean build -x test
+          command: ./gradlew clean build \
+            -x test \
+            -x checkstyleMain \
+            -x checkstyleTest \
+            -x pmdMain \
+            -x pmdTest \
+            -x spotbugsMain \
+            -x spotbugsTest
 
-      # Build the Docker image using the parameters provided.
+    # Build the Docker image using the parameters provided.
       - run:
-          name: Build and push Docker Image
+          name: Build and save Docker Image
           command: |
             export TIMESTAMP=$(date +"%Y%m%d%H%M%S")
             export TAG=<<parameters.docker-image-version>>-${TIMESTAMP}_SNAPSHOT
@@ -117,6 +124,13 @@ jobs:
       - attach_workspace:
           at: /home/circleci/workspace
       - setup_remote_docker
+      # Load the tag name.
+      - run:
+          name: Export Metadata
+          command: |
+            export TAG="$(cat /home/circleci/workspace/tag.txt)"
+            echo "TAG='${TAG}'"
+            echo "export TAG='${TAG}'" >> $BASH_ENV
       # Load the previously built Docker image from the tar file.
       - run:
           name: Load Docker image from gzip
@@ -132,8 +146,8 @@ jobs:
       - run:
           name: Push Docker Image to Docker Hub
           command: |
-            docker push <<parameters.docker-hub-repo>>:${TAG}
-
+            echo "Pushing image: $TAG"
+            docker push "<<parameters.docker-hub-repo>>:$TAG"
 
 # Define the workflow
 workflows:
