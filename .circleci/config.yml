@@ -48,8 +48,8 @@ jobs:
           path: build/reports/spotbugs/
           destination: jacoco-test-reports/quality-checks/spotbugs
 
-  # The 'build-and-push-image' job is responsible for building the Docker image for the application.
-  build-and-push-image:
+  # The 'package' job is responsible for building the Docker image for the application.
+  package:
     executor: java-executor  # Using the same 'java-executor' as defined earlier
 
     parameters:
@@ -69,6 +69,9 @@ jobs:
       docker-hub-repo:
         default: faizqureshi/java-demo  # Replace with your docker hub host repository name
         type: string
+      docker-image-version:
+        default: 1.0.0  # Replace with your docker hub host repository name
+        type: string
 
     steps:
       # Checkout the latest code from the repository
@@ -77,36 +80,93 @@ jobs:
       # Set up Docker to run in CircleCI, enabling Docker commands within the job.
       - setup_remote_docker
       - run:
-          name: Set Execute Permission for Maven Wrapper
+          name: Set Execute Permission for Gradle Wrapper
           command: chmod +x ./gradlew
 
       - run:
           name: Gradle build
           command: ./gradlew clean build -x test
 
-      # Log in to Docker Hub using credentials stored as environment variables.
-      # It allows CircleCI to push images to the Docker registry.
-      - run:
-          name: Log in to Docker Hub
-          command: echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
-
       # Build the Docker image using the parameters provided.
       - run:
           name: Build and push Docker Image
           command: |
             export TIMESTAMP=$(date +"%Y%m%d%H%M%S")
+            export TAG=<<parameters.docker-image-version>>-${TIMESTAMP}_SNAPSHOT
             docker build \
               --build-arg SERVICE_NAME=<<parameters.service-name>> \
               --build-arg MAINTAINER=<<parameters.maintainer>> \
               --build-arg JAR_FILE_PATH=<<parameters.jar-file-path>> \
               --build-arg JAR_FILE_NAME=<<parameters.jar-file-name>> \
-              -t <<parameters.docker-hub-repo>>:1.0.0-${TIMESTAMP}_SNAPSHOT .
-            docker push <<parameters.docker-hub-repo>>:1.0.0-${TIMESTAMP}_SNAPSHOT
+              -t <<parameters.docker-hub-repo>>:${TAG} .
+            docker save -o my-app.tar <<parameters.repo>>:${TAG}
+            echo $TAG > tag.txt
+            docker push <<parameters.docker-hub-repo>>:${TAG}
+            # Save the generated tag and Docker image for later stages.
+      - persist_to_workspace:
+          root: ~/workspace
+          paths:
+            - tag.txt
+            - my-app.tar
+  publish:
+    executor: java-executor  # Using the same 'java-executor' as defined earlier
+    parameters:
+      docker-hub-repo:
+        default: faizqureshi/java-demo  # Replace with your docker hub host repository name
+        type: string
+    steps:
+      - checkout
+      - attach_workspace:
+          at: ~/workspace
+      - setup_remote_docker
+      # Load the previously built Docker image from the tar file.
+      - run:
+          name: Load Docker image from gzip
+          command: |
+            docker load -i ~/workspace/my-app.tar
+            # Authenticate with Docker Hub.
+      # Log in to Docker Hub using credentials stored as environment variables in circleCI.
+      # It allows CircleCI to push images to the Docker registry.
+      - run:
+          name: Log in to Docker Hub
+          command: echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_USERNAME --password-stdin
+      # Tag the Docker image for pushing to Docker Hub
+      - run:
+          name: Tag Docker Image
+          command: |
+            docker tag <<parameters.docker-hub-repo>>:${TAG} $DOCKERHUB_USERNAME/<<parameters.docker-hub-repo>>:$TAG
+      # Push the Docker image to Docker Hub
+      - run:
+          name: Push Docker Image to Docker Hub
+          command: |
+            docker push <<parameters.docker-hub-repo>>:$TAG
+
 
 # Define the workflow
 workflows:
   version: 2
-  build-test-workflow:
+  build:
     jobs:
-      - build-and-install
-      - build-and-push-image
+      - build:
+          name: build
+          filters:
+            branches:
+              only:
+                - main # Add your branch name
+      - package:
+          name: package
+          requires:
+            - build
+          filters:
+            branches:
+              only:
+                - main # Add your branch name
+      - publish:
+          name: publish
+          requires:
+            - package
+          filters:
+            branches:
+              only:
+                - main # Add your branch name
+      # Add your implementation for the deploy stage here.
