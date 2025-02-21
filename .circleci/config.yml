@@ -33,62 +33,57 @@ jobs:
           path: build/reports/jacoco/test/html
           destination: jacoco-test-reports/
 
-      # Store Checkstyle report
+      # Store quality check reports
       - store_artifacts:
           path: build/reports/checkstyle/
-          destination: jacoco-test-reports/quality-checks/checkstyle
-
-      # Store the PMD report (usually found in 'target/pmd.xml') as an artifact.
+          destination: quality-checks/checkstyle
       - store_artifacts:
           path: build/reports/pmd/
-          destination: jacoco-test-reports/quality-checks/pmd
-
-      # Store the SpotBugs report (usually found in 'target/spotbugs.html') as an artifact.
+          destination: quality-checks/pmd
       - store_artifacts:
           path: build/reports/spotbugs/
-          destination: jacoco-test-reports/quality-checks/spotbugs
+          destination: quality-checks/spotbugs
 
-  # The 'package' job is responsible for building the Docker image for the application.
+      # Persist compiled JAR file and build outputs
+      - persist_to_workspace:
+          root: .
+          paths:
+            - build/libs/animal-insurance.war
+
   package:
-    executor: java-executor  # Using the same 'java-executor' as defined earlier
+    executor: java-executor
     working_directory: ~/workspace
     parameters:
-      # Parameters allow customization of Docker build arguments, such as service name, maintainer, and repo name.
       service-name:
-        default: generated-fineos  # Replace with the name of your root directory
+        default: generated-fineos
         type: string
       maintainer:
-        default: faiz.qureshi@everestek.com  # Replace with the Docker file maintainer's email
+        default: faiz.qureshi@everestek.com
         type: string
       jar-file-name:
-        default: animal-insurance.war  # Replace with the name of the generated jar file.
+        default: animal-insurance.war
         type: string
       jar-file-path:
-        default: build/libs/animal-insurance.war  # Replace with the path where the generated jar file is located.
+        default: build/libs/animal-insurance.war
         type: string
       docker-hub-repo:
-        default: faizqureshi/java-demo  # Replace with your docker hub host repository name
+        default: faizqureshi/java-demo
         type: string
       docker-image-version:
-        default: 1.0.0  # Replace with your docker hub host repository name
+        default: 1.0.0
         type: string
 
     steps:
-      # Checkout the latest code from the repository
       - checkout
 
-      # Set up Docker to run in CircleCI, enabling Docker commands within the job.
+      # Attach workspace to use the built JAR file
+      - attach_workspace:
+          at: .
+
+      # Set up Docker
       - setup_remote_docker
-      - run:
-          name: Set Execute Permission for Gradle Wrapper
-          command: chmod +x ./gradlew
 
-      - run:
-          name: Gradle build
-          command: |
-            ./gradlew clean build -x test -x checkstyleMain -x checkstyleTest -x pmdMain -x pmdTest -x spotbugsMain -x spotbugsTest
-
-    # Build the Docker image using the parameters provided.
+      # Build and save Docker image
       - run:
           name: Build and save Docker Image
           command: |
@@ -102,56 +97,62 @@ jobs:
               -t <<parameters.docker-hub-repo>>:${TAG} .
             docker save -o my-app.tar <<parameters.docker-hub-repo>>:${TAG}
             echo $TAG > tag.txt
+
+      # Persist Docker image and tag for publish job
       - persist_to_workspace:
           root: /home/circleci/workspace
           paths:
             - tag.txt
             - my-app.tar
+
   publish:
-    executor: java-executor  # Using the same 'java-executor' as defined earlier
+    executor: java-executor
     parameters:
       docker-hub-repo:
-        default: faizqureshi/java-demo  # Replace with your docker hub host repository name
+        default: faizqureshi/java-demo
         type: string
     steps:
       - checkout
       - attach_workspace:
           at: /home/circleci/workspace
       - setup_remote_docker
-      # Load the tag name.
+
+      # Load tag name
       - run:
           name: Export Metadata
           command: |
             export TAG="$(cat /home/circleci/workspace/tag.txt)"
             echo "TAG='${TAG}'"
             echo "export TAG='${TAG}'" >> $BASH_ENV
-      # Load the previously built Docker image from the tar file.
+
+      # Load Docker image from tar file
       - run:
-          name: Load Docker image from gzip
-          command: |
-            docker load -i /home/circleci/workspace/my-app.tar
-            # Authenticate with Docker Hub.
-      # Log in to Docker Hub using credentials stored as environment variables in circleCI.
-      # It allows CircleCI to push images to the Docker registry.
+          name: Load Docker image
+          command: docker load -i /home/circleci/workspace/my-app.tar
+
+      # Log in to Docker Hub
       - run:
           name: Log in to Docker Hub
           command: echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_USERNAME --password-stdin
-      # Push the Docker image to Docker Hub
+
+      # Push Docker image to Docker Hub
       - run:
           name: Push Docker Image to Docker Hub
           command: |
             echo "Pushing image: $TAG"
-            docker push "<<parameters.docker-hub-repo>>:$TAG"
+            docker push <<parameters.docker-hub-repo>>:$TAG
 
 # Define the workflow
 workflows:
   version: 2
   build:
     jobs:
-#      - build:
-#          name: build
+      - build:
+          name: build
       - package:
           name: package
+          requires:
+            - build  # Ensure package runs only after build is done
       - publish:
           name: publish
           requires:
