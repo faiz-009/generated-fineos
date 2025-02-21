@@ -48,9 +48,62 @@ jobs:
           path: build/reports/spotbugs/
           destination: jacoco-test-reports/quality-checks/spotbugs
 
+  # The 'build-and-push-image' job is responsible for building the Docker image for the application.
+  build-and-push-image:
+    executor: java-executor  # Using the same 'java-executor' as defined earlier
+
+    parameters:
+      # Parameters allow customization of Docker build arguments, such as service name, maintainer, and repo name.
+      service-name:
+        default: java-demo  # Replace with the name of your root directory
+        type: string
+      maintainer:
+        default: faiz.qureshi@everestek.com  # Replace with the Docker file maintainer's email
+        type: string
+      micro-service-name:
+        default: sftp-connector  # Replace with your specific microservice name
+        type: string
+      docker-repo:
+        default: faizqureshi/java-demo  # Replace with your docker host repository name
+        type: string
+
+    steps:
+      # Checkout the latest code from the repository
+      - checkout
+
+      # Set up Docker to run in CircleCI, enabling Docker commands within the job.
+      - setup_remote_docker
+      - run:
+          name: Set Execute Permission for Maven Wrapper
+          command: chmod +x ./gradlew
+
+      - run:
+          name: Maven build
+          command: ./gradlew clean build -x test
+
+      # Log in to Docker Hub using credentials stored as environment variables.
+      # It allows CircleCI to push images to the Docker registry.
+      - run:
+          name: Log in to Docker Hub
+          command: echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
+
+      # Build the Docker image using the parameters provided.
+      - run:
+          name: Build and push Docker Image
+          command: |
+            export TIMESTAMP=$(date +"%Y%m%d%H%M%S")
+            docker build \
+              --build-arg SERVICE_NAME=<<parameters.service-name>> \
+              --build-arg MAINTAINER=<<parameters.maintainer>> \
+              --build-arg JAR_FILE_PATH=target/<<parameters.micro-service-name>>-1.0.war \
+              --build-arg JAR_FILE_NAME=<<parameters.micro-service-name>>-1.0.war \
+              -t <<parameters.docker-repo>>:1.0.0-${TIMESTAMP}_SNAPSHOT .
+            docker push <<parameters.docker-repo>>:1.0.0-${TIMESTAMP}_SNAPSHOT
+
 # Define the workflow
 workflows:
   version: 2
   build-test-workflow:
     jobs:
       - build-and-install
+      - build-and-push-image
