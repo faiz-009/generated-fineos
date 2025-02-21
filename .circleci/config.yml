@@ -6,10 +6,20 @@ executors:
     docker:
       - image: cimg/openjdk:21.0.2  # OpenJDK 21 Docker image for Java-based builds
 
+global-parameters: &global-params
+  service-name: generated-fineos
+  maintainer: faiz.qureshi@everestek.com
+  jar-file-name: animal-insurance.war
+  jar-file-path: build/libs/animal-insurance.war
+  docker-hub-repo: faizqureshi/java-demo
+  docker-image-version: 1.0.0
+
 # Define the jobs
 jobs:
   build:
     executor: java-executor
+    parameters:
+      <<: *global-params
     steps:
       - checkout
 
@@ -47,31 +57,13 @@ jobs:
       # Persist compiled JAR file and build outputs
       - persist_to_workspace:
           root: .
-          paths:
-            - build/libs/animal-insurance.war
+          paths: <<parameters.jar-file-path>>
 
   package:
     executor: java-executor
     working_directory: ~/workspace
     parameters:
-      service-name:
-        default: generated-fineos
-        type: string
-      maintainer:
-        default: faiz.qureshi@everestek.com
-        type: string
-      jar-file-name:
-        default: animal-insurance.war
-        type: string
-      jar-file-path:
-        default: build/libs/animal-insurance.war
-        type: string
-      docker-hub-repo:
-        default: faizqureshi/java-demo
-        type: string
-      docker-image-version:
-        default: 1.0.0
-        type: string
+      <<: *global-params
 
     steps:
       - checkout
@@ -108,9 +100,7 @@ jobs:
   publish:
     executor: java-executor
     parameters:
-      docker-hub-repo:
-        default: faizqureshi/java-demo
-        type: string
+      <<: *global-params
     steps:
       - checkout
       - attach_workspace:
