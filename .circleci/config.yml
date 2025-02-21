@@ -8,7 +8,7 @@ executors:
 
 # Define the jobs
 jobs:
-  build-and-install:
+  build:
     executor: java-executor
     steps:
       - checkout
